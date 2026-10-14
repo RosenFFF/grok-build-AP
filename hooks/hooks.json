@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${GROK_PLUGIN_ROOT}/hooks/hook.js\"", "timeout": 15 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${GROK_PLUGIN_ROOT}/hooks/hook.js\"", "timeout": 15 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${GROK_PLUGIN_ROOT}/hooks/hook.js\"", "timeout": 15 }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${GROK_PLUGIN_ROOT}/hooks/hook.js\"", "timeout": 15 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node \"${GROK_PLUGIN_ROOT}/hooks/hook.js\"", "timeout": 120 }
+        ]
+      }
+    ]
+  }
+}

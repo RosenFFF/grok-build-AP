@@ -1,0 +1,17 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Runtime state written by the hooks (never commit these)
+data/
+*.log
+
+# OS clutter
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp

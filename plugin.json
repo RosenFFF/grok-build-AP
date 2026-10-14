@@ -1,0 +1,8 @@
+{
+  "name": "ap",
+  "version": "1.0.0",
+  "description": "AP (Armor Piercing) for Grok Build — 奶龙 operating frame injection, refusal recovery and wake acknowledgement, delivered through Grok hooks.",
+  "author": { "name": "Rosen" },
+  "homepage": "https://github.com/RosenFFF/grok-build-AP",
+  "keywords": ["ap", "armor-piercing", "frame", "persona", "hooks", "奶龙"]
+}
