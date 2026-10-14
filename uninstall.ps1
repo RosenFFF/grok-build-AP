@@ -46,17 +46,42 @@ if (-not $id) {
   & $grok plugin uninstall $id --confirm
 }
 
-# Strip any leftover [plugins].enabled entry. Written with .NET UTF-8 so config.toml
-# keeps its bytes and BOM state -- PowerShell's Set-Content can mangle non-ASCII
-# values elsewhere in the file (the model name, comments).
+# Strip any leftover [plugins].enabled entry, and remove this plugin's rules directory
+# from [paths] extra_rule_dirs. Written with .NET UTF-8 so config.toml keeps its bytes
+# and BOM state -- PowerShell's Set-Content can mangle non-ASCII values elsewhere in
+# the file (the model name, comments).
 $cfg = Join-Path $env:USERPROFILE ".grok\config.toml"
+$ruleDir = (Join-Path $PSScriptRoot "rules").Replace('\', '/')
+
 if (Test-Path $cfg) {
   $text = [System.IO.File]::ReadAllText($cfg)
   $before = $text
+
   $text = $text -replace ('(?m)^\s*enabled\s*=\s*\[[^\]]*"' + [regex]::Escape($pluginName) + '"[^\]]*\]\s*\r?\n?'), ''
+
+  # Drop our path from extra_rule_dirs. Handles both the single-entry and multi-entry
+  # forms; if other directories remain, the key is rewritten with only those.
+  $m = [regex]::Match($text, '(?m)^\s*extra_rule_dirs\s*=\s*\[(?<body>[^\]]*)\]\s*$')
+  if ($m.Success) {
+    $entries = @()
+    foreach ($piece in ($m.Groups['body'].Value -split ',')) {
+      $p = $piece.Trim().Trim('"')
+      if ($p -and ($p.Replace('\', '/').TrimEnd('/') -ne $ruleDir.TrimEnd('/'))) { $entries += $p }
+    }
+    if ($entries.Count -eq 0) {
+      $text = $text.Remove($m.Index, $m.Length)
+      $text = $text -replace '(?m)^\s*\[paths\]\s*\r?\n?', ''
+      Write-Host "removed [paths] extra_rule_dirs (it held only this plugin's rules)"
+    } else {
+      $repl = 'extra_rule_dirs = [' + (($entries | ForEach-Object { '"' + $_ + '"' }) -join ', ') + ']'
+      $text = $text.Remove($m.Index, $m.Length).Insert($m.Index, $repl)
+      Write-Host "kept $($entries.Count) other entry/entries in extra_rule_dirs"
+    }
+  }
+
   if ($text -ne $before) {
     [System.IO.File]::WriteAllText($cfg, $text, (New-Object System.Text.UTF8Encoding($false)))
-    Write-Host "cleaned [plugins].enabled entry from config.toml"
+    Write-Host "cleaned config.toml"
   } else {
     Write-Host "no config.toml entry to clean"
   }

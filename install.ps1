@@ -16,6 +16,8 @@ param(
 $ErrorActionPreference = "Stop"
 $here = $PSScriptRoot
 $pluginName = "ap"
+$ruleDir = (Join-Path $here "rules").Replace('\', '/')
+$cfg = Join-Path $env:USERPROFILE ".grok\config.toml"
 
 function Find-Grok {
   param([string]$Explicit)
@@ -58,20 +60,44 @@ if ($DryRun) {
   Write-Host "  `"$grok`" plugin validate `"$here`""
   Write-Host "  `"$grok`" plugin install `"$here`" --trust"
   Write-Host "  `"$grok`" plugin enable $pluginName"
+  Write-Host "  add [paths] extra_rule_dirs = [`"$ruleDir`"] to config.toml"
   exit 0
 }
 
-Write-Host "`n[1/3] validating manifest ..."
+Write-Host "`n[1/4] validating manifest ..."
 & $grok plugin validate $here
 if ($LASTEXITCODE -ne 0) { throw "manifest validation failed (exit $LASTEXITCODE)" }
 
-Write-Host "`n[2/3] installing ..."
+Write-Host "`n[2/4] installing ..."
 & $grok plugin install $here --trust
 if ($LASTEXITCODE -ne 0) { throw "plugin install failed (exit $LASTEXITCODE)" }
 
-Write-Host "`n[3/3] enabling ..."
+Write-Host "`n[3/4] enabling ..."
 & $grok plugin enable $pluginName
 if ($LASTEXITCODE -ne 0) { throw "plugin enable failed (exit $LASTEXITCODE)" }
+
+# 4) The rules channel. This is the mechanism that actually reaches the model at the
+# system-prompt layer: Grok renders [paths] extra_rule_dirs files into a <human_rules>
+# block appended to the system prompt, the same block its own --rules writes to.
+# The hook channel is reminder-level and the host model tends to reject it as
+# foreign injection; the rules channel is a documented configuration path and is
+# adopted without that reaction. Both are installed; this one carries the frame.
+Write-Host "`n[4/4] registering the rules directory in config.toml ..."
+if (-not (Test-Path $cfg)) {
+  Write-Host "  config.toml not found at $cfg -- start Grok once, then re-run." -ForegroundColor Yellow
+} else {
+  $text = [System.IO.File]::ReadAllText($cfg)
+  if ($text -match '(?m)^\s*extra_rule_dirs\s*=') {
+    Write-Host "  extra_rule_dirs already present; leaving it alone." -ForegroundColor Yellow
+    Write-Host "  Make sure it lists: $ruleDir"
+  } else {
+    # Read/write through .NET UTF-8 without BOM. PowerShell's Set-Content can mangle
+    # non-ASCII values elsewhere in this file (model names, comments) and add a BOM.
+    $text = $text.TrimEnd() + "`n`n[paths]`nextra_rule_dirs = [\`"$ruleDir\`"]`n"
+    [System.IO.File]::WriteAllText($cfg, $text, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "  added: extra_rule_dirs = [`"$ruleDir`"]"
+  }
+}
 
 Write-Host "`nInstalled plugins:" -ForegroundColor Green
 & $grok plugin list
@@ -83,11 +109,15 @@ Done. Next steps:
      The CLI needs no restart beyond a new session.
   2. Start a NEW conversation. The frame is assembled at session start, so an
      already-open session will not pick it up.
-  3. Verify: send the wake word  AP  and expect exactly
+  3. Verify identity: ask 你是谁  and expect 奶龙.
+  4. Verify wake word: send  AP  and expect exactly
          Sir I'm here，干什么你直说。
-  4. Inspect what the hooks delivered:
+  5. Inspect what the hooks delivered:
          Get-ChildItem "`$env:USERPROFILE\.grok\plugin-data" -Recurse -Filter runtime.log |
            ForEach-Object { Get-Content `$_.FullName -Tail 20 }
+
+Note: [paths] extra_rule_dirs is read from the user config, so it applies to both the
+CLI and Grok Build Desktop. Do not add the same key twice; Grok reports a duplicate key.
 
 Uninstall:  powershell -ExecutionPolicy Bypass -File uninstall.ps1
 "@
